@@ -2,6 +2,7 @@ import * as React from "react";
 import styled from "styled-components";
 import WalletConnect from "@walletconnect/browser";
 import WalletConnectQRCodeModal from "@walletconnect/qrcode-modal";
+import { convertUtf8ToHex } from "@walletconnect/utils";
 import { IInternalEvent } from "@walletconnect/types";
 import Button from "./components/Button";
 import Column from "./components/Column";
@@ -23,7 +24,8 @@ import {
   ecrecover,
   isMobile,
   parseQueryString,
-  appendToQueryString
+  appendToQueryString,
+  recoverPersonalSignature
   // clickLink
 } from "./helpers/utilities";
 import {
@@ -292,6 +294,7 @@ class App extends React.Component<any, any> {
       await this.setState({ deepLinks });
     }
   };
+  
 
   public walletConnectInitFromStorage = async (
     walletConnector: WalletConnect
@@ -457,6 +460,13 @@ class App extends React.Component<any, any> {
     };
 
     try {
+
+
+      if (isMobile()) {
+        setTimeout(()=>{
+          location.href='https://metamask.app.link/focus'
+        });
+      }
       // open modal
       this.toggleModal();
 
@@ -473,6 +483,65 @@ class App extends React.Component<any, any> {
         from: address,
         to: address,
         value: "0 ETH"
+      };
+
+      // display result
+      this.setState({
+        walletConnector,
+        pendingRequest: false,
+        result: formattedResult || null
+      });
+    } catch (error) {
+      console.error(error); // tslint:disable-line
+      this.setState({ walletConnector, pendingRequest: false, result: null });
+    }
+  };
+
+  public testSignPersonalMessage = async () => {
+    const { walletConnector, address } = this.state;
+
+    if (!walletConnector) {
+      return;
+    }
+    
+
+    // test message
+    const message = "My email is john@doe.com - 1537836206101";
+
+    // encode message (hex)
+    const hexMsg = convertUtf8ToHex(message);
+
+    // personal_sign params
+    const msgParams = [hexMsg, address];
+
+    try {
+
+      if (isMobile()) {
+        setTimeout(()=>{
+          location.href='https://metamask.app.link/focus'
+        });
+      }
+
+      // open modal
+      this.toggleModal();
+
+      // toggle pending request indicator
+      this.setState({ pendingRequest: true });
+
+      // send message
+      const result = await walletConnector.signPersonalMessage(msgParams);
+
+      // verify signature
+      const signer = recoverPersonalSignature(result, message);
+      const verified = signer.toLowerCase() === address.toLowerCase();
+
+      // format displayed result
+      const formattedResult = {
+        method: "personal_sign",
+        address,
+        signer,
+        verified,
+        result
       };
 
       // display result
@@ -683,8 +752,8 @@ class App extends React.Component<any, any> {
                       {"Send Test Transaction"}
                     </STestButton>
 
-                    <STestButton left onClick={this.testSignMessage}>
-                      {"Sign Test Message"}
+                    <STestButton left onClick={this.testSignPersonalMessage}>
+                      {"Sign Test Personal Message"}
                     </STestButton>
 
                     <STestButton
